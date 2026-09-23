@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title> FACE TRACKER</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a0a;
+            overflow: hidden;
+            height: 100vh;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(rgba(0, 255, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 0, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            z-index: -1;
+        }
+        
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: rgba(0, 255, 0, 0.1);
+            animation: scan 4s linear infinite;
+            z-index: 999;
+            pointer-events: none;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+        
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        
+        #video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 1;
+        }
+        
+        #video {
+            display: none;
+        }
+        
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            transform: scaleX(-1);
+            background: #000;
+            image-rendering: pixelated;
+        }
+        
+        .hacker-overlay {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            color: #00ff00;
+            font-size: 14px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            pointer-events: none;
+        }
+        
+        .hacker-overlay .title {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            border-right: 2px solid #00ff00;
+            padding-right: 10px;
+            animation: blink 1s step-end infinite;
+        }
+        
+        @keyframes blink {
+            50% { border-color: transparent; }
+        }
+        
+        .status-box {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #00ff00;
+            padding: 12px 30px;
+            color: #00ff00;
+            font-size: 16px;
+            letter-spacing: 2px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border-radius: 4px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.2);
+            pointer-events: none;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .status-box .blink-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #00ff00;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 1.5s ease-in-out infinite;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.8); }
+        }
+        
+        #startBtn {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 200;
+            background: transparent;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 20px 50px;
+            font-size: 22px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            letter-spacing: 4px;
+            transition: all 0.3s;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.1);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+        }
+        
+        #startBtn:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 80px rgba(0, 255, 0, 0.4);
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+        
+        #startBtn.hidden {
+            display: none;
+        }
+        
+        .corner {
+            position: fixed;
+            width: 30px;
+            height: 30px;
+            border-color: #00ff00;
+            border-style: solid;
+            border-width: 0;
+            z-index: 50;
+            opacity: 0.6;
+        }
+        .corner-tl { top: 20px; left: 20px; border-top-width: 2px; border-left-width: 2px; }
+        .corner-tr { top: 20px; right: 20px; border-top-width: 2px; border-right-width: 2px; }
+        .corner-bl { bottom: 20px; left: 20px; border-bottom-width: 2px; border-left-width: 2px; }
+        .corner-br { bottom: 20px; right: 20px; border-bottom-width: 2px; border-right-width: 2px; }
+        
+        #fpsCounter {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            opacity: 0.7;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .hacker-overlay .title { font-size: 16px; }
+            .status-box { font-size: 12px; padding: 8px 15px; bottom: 15px; width: 90%; }
+            #startBtn { padding: 15px 30px; font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="matrix-bg"></div>
+    <div class="scanline"></div>
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+    
+    <div class="hacker-overlay">
+        <div class="title">▶ FACE_TRACKER</div>
+        <div style="margin-top: 8px; font-size: 11px; opacity: 0.6;">[ SYSTEM_ACTIVE ]</div>
+    </div>
+    
+    <div id="fpsCounter">FPS: 0</div>
+    <video id="video" style="display:none;"></video>
+    
+    <div id="video-container">
+        <canvas id="canvas"></canvas>
+    </div>
+    
+    <button id="startBtn">⏣ INITIALIZE</button>
+    
+    <div class="status-box" id="status">
+        <span class="blink-dot"></span>
+        <span id="statusText">AWAITING PERMISSION</span>
+    </div>
+
+    <!-- ✅ WebGL-এর পরিবর্তে CPU-ভিত্তিক ট্র্যাকিং (TensorFlow.js + FaceMesh) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-cpu"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
+
+    <script>
+        (function() {
+            // DOM এলিমেন্ট
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const statusText = document.getElementById('statusText');
+            const startBtn = document.getElementById('startBtn');
+            const fpsCounter = document.getElementById('fpsCounter');
+            
+            // ক্যানভাস সাইজ
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            let frameCount = 0;
+            let lastFpsUpdate = performance.now();
+            let isTracking = false;
+            
+            // ✅ TensorFlow.js CPU ব্যাকএন্ড সেট
+            tf.setBackend('cpu');
+            
+            let faceModel = null;
+            let handModel = null;
+            
+            // ✅ মডেল লোড
+            async function loadModels() {
+                try {
+                    statusText.textContent = '◉ LOADING AI MODELS...';
+                    
+                    // ফেস মডেল (MediaPipe FaceMesh - CPU ভার্সন)
+                    faceModel = await faceLandmarksDetection.load(
+                        faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
+                        { shouldLoadIris: false }
+                    );
+                    
+                    // হ্যান্ড মডেল
+                    handModel = await handpose.load();
+                    
+                    statusText.textContent = '◉ MODELS LOADED | STARTING CAMERA...';
+                    return true;
+                } catch (err) {
+                    console.error('মডেল লোড এরর:', err);
+                    statusText.textContent = '✖ MODEL LOAD FAILED';
+                    return false;
+                }
+            }
+            
+            // ✅ ফেস ট্র্যাকিং
+            async function detectFace(video) {
+                try {
+                    const predictions = await faceModel.estimateFaces(video);
+                    return predictions;
+                } catch (err) {
+                    return null;
+                }
+            }
+            
+            // ✅ হ্যান্ড ট্র্যাকিং
+            async function detectHand(video) {
+                try {
+                    const predictions = await handModel.estimateHands(video);
+                    return predictions;
+                } catch (err) {
+                    return null;
+                }
+            }
+            
+            // ✅ ড্রইং ফাংশন
+            async function drawResults() {
+                if (!isTracking) {
+                    requestAnimationFrame(drawResults);
+                    return;
+                }
+                
+                const w = canvas.width;
+                const h = canvas.height;
+                
+                // ভিডিও ফ্রেম
+                if (video.readyState >= 2) {
+                    ctx.drawImage(video, 0, 0, w, h);
+                }
+                
+                // ফেস ডিটেক্ট
+                let faceData = null;
+                let handData = null;
+                
+                try {
+                    [faceData, handData] = await Promise.all([
+                        detectFace(video),
+                        detectHand(video)
+                    ]);
+                } catch (err) {
+                    // সাইলেন্ট ফেইল
+                }
+                
+                // ✅ ফেস ড্র
+                if (faceData && faceData.length > 0) {
+                    for (const face of faceData) {
+                        // ফেসের বাউন্ডিং বক্স
+                        const annotations = face.annotations;
+                        if (annotations && annotations.silhouette) {
+                            const points = annotations.silhouette;
+                            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                            
+                            for (const pt of points) {
+                                const x = pt[0] * w;
+                                const y = pt[1] * h;
+                                if (x < minX) minX = x;
+                                if (y < minY) minY = y;
+                                if (x > maxX) maxX = x;
+                                if (y > maxY) maxY = y;
+                            }
+                            
+                            const padding = 10;
+                            const x = minX - padding;
+                            const y = minY - padding;
+                            const bw = (maxX - minX) + padding * 2;
+                            const bh = (maxY - minY) + padding * 2;
+                            
+                            // বক্স
+                            ctx.shadowColor = '#00ff00';
+                            ctx.shadowBlur = 20;
+                            ctx.strokeStyle = '#00ff00';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(x, y, bw, bh);
+                            
+                            // কর্নার
+                            const cs = 15;
+                            ctx.lineWidth = 3;
+                            ctx.beginPath();
+                            ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y);
+                            ctx.moveTo(x + bw - cs, y); ctx.lineTo(x + bw, y); ctx.lineTo(x + bw, y + cs);
+                            ctx.moveTo(x, y + bh - cs); ctx.lineTo(x, y + bh); ctx.lineTo(x + cs, y + bh);
+                            ctx.moveTo(x + bw - cs, y + bh); ctx.lineTo(x + bw, y + bh); ctx.lineTo(x + bw, y + bh - cs);
+                            ctx.stroke();
+                            
+                            // লেবেল
+                            ctx.shadowBlur = 15;
+                            ctx.font = 'bold 18px "Courier New", monospace';
+                            ctx.fillStyle = '#00ff00';
+                            ctx.fillText('▶ TARGET_LOCKED', x + 10, y - 12);
+                            
+                            // কোঅর্ডিনেট
+                            ctx.font = '12px "Courier New", monospace';
+                            ctx.fillStyle = 'rgba(0, 255, 0, 0.6)';
+                            const cx = (minX + maxX) / 2;
+                            const cy = (minY + maxY) / 2;
+                            ctx.fillText(`X:${Math.round(cx)} Y:${Math.round(cy)}`, x + 10, y + bh + 22);
+                        }
+                    }
+                }
+                
+                // ✅ হাত ড্র
+                if (handData && handData.length > 0) {
+                    for (const hand of handData) {
+                        const landmarks = hand.landmarks;
+                        if (landmarks) {
+                            // পয়েন্ট ড্র
+                            for (const lm of landmarks) {
+                                const lx = lm[0] * w;
+                                const ly = lm[1] * h;
+                                ctx.shadowColor = '#ff6600';
+                                ctx.shadowBlur = 25;
+                                ctx.beginPath();
+                                ctx.arc(lx, ly, 5, 0, 2 * Math.PI);
+                                ctx.fillStyle = '#ff6600';
+                                ctx.fill();
+                                
+                                ctx.shadowBlur = 40;
+                                ctx.beginPath();
+                                ctx.arc(lx, ly, 2, 0, 2 * Math.PI);
+                                ctx.fillStyle = '#ffaa00';
+                                ctx.fill();
+                            }
+                            
+                            // কানেকশন
+                            const connections = [
+                                [0,1],[1,2],[2,3],[3,4],
+                                [0,5],[5,6],[6,7],[7,8],
+                                [5,9],[9,10],[10,11],[11,12],
+                                [9,13],[13,14],[14,15],[15,16],
+                                [13,17],[17,18],[18,19],[19,20],
+                                [0,17]
+                            ];
+                            ctx.shadowBlur = 15;
+                            ctx.shadowColor = '#ff6600';
+                            ctx.strokeStyle = 'rgba(255, 102, 0, 0.6)';
+                            ctx.lineWidth = 1.5;
+                            
+                            for (const [i, j] of connections) {
+                                const p1 = landmarks[i];
+                                const p2 = landmarks[j];
+                                if (p1 && p2) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(p1[0] * w, p1[1] * h);
+                                    ctx.lineTo(p2[0] * w, p2[1] * h);
+                                    ctx.stroke();
+                                }
+                            }
+                            
+                            // হাতের লেবেল
+                            const wrist = landmarks[0];
+                            if (wrist) {
+                                ctx.shadowBlur = 20;
+                                ctx.font = '14px "Courier New", monospace';
+                                ctx.fillStyle = '#ff6600';
+                                ctx.fillText('✋ HAND_DETECTED', wrist[0] * w - 30, wrist[1] * h - 25);
+                            }
+                        }
+                    }
+                }
+                
+                ctx.shadowBlur = 0;
+                
+                // স্ট্যাটাস
+                const faceDetected = faceData && faceData.length > 0;
+                const handDetected = handData && handData.length > 0;
+                
+                let statusMsg = '';
+                if (faceDetected && handDetected) {
+                    statusMsg = '◉ FACE & HAND TRACKING ACTIVE';
+                } else if (faceDetected) {
+                    statusMsg = '◉ FACE TRACKING ACTIVE | HAND: SCANNING...';
+                } else if (handDetected) {
+                    statusMsg = '◉ HAND TRACKING ACTIVE | FACE: SCANNING...';
+                } else {
+                    statusMsg = '◉ SCANNING FOR TARGETS...';
+                }
+                statusText.textContent = statusMsg;
+                
+                // FPS
+                frameCount++;
+                const now = performance.now();
+                if (now - lastFpsUpdate >= 1000) {
+                    fpsCounter.textContent = `FPS: ${frameCount}`;
+                    frameCount = 0;
+                    lastFpsUpdate = now;
+                }
+                
+                requestAnimationFrame(drawResults);
+            }
+            
+            // ✅ ক্যামেরা স্টার্ট
+            async function initCamera() {
+                try {
+                    statusText.textContent = '◉ REQUESTING CAMERA PERMISSION...';
+                    startBtn.classList.add('hidden');
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            facingMode: 'user'
+                        }
+                    });
+                    
+                    video.srcObject = stream;
+                    await video.play();
+                    
+                    // মডেল লোড
+                    const loaded = await loadModels();
+                    if (!loaded) {
+                        statusText.textContent = '✖ MODEL LOAD FAILED';
+                        return;
+                    }
+                    
+                    statusText.textContent = '◉ TRACKING STARTED...';
+                    isTracking = true;
+                    
+                    // ড্রইং লুপ
+                    requestAnimationFrame(drawResults);
+                    
+                } catch (err) {
+                    console.error('ক্যামেরা এরর:', err);
+                    statusText.textContent = '✖ PERMISSION DENIED OR CAMERA NOT FOUND';
+                    startBtn.classList.remove('hidden');
+                    startBtn.textContent = '⏣ RETRY';
+                    alert('❌ ক্যামেরা অ্যাক্সেস দেওয়া হয়নি!\nব্রাউজার সেটিংসে ক্যামেরা পারমিশন দিন।');
+                }
+            }
+            
+            startBtn.addEventListener('click', initCamera);
+            console.log('🔥 FACE TRACKER (CPU VERSION)');
+        })();
+    </script>
+</body>
+</html>
